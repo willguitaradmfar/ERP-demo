@@ -1,0 +1,173 @@
+// Prisma Schema - ERP Admin
+// Database: SQLite
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USUÁRIOS E AUTENTICAÇÃO ====================
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  password       String
+  role           String    @default("user") // admin, user
+  isActive       Boolean   @default(true)
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  lastLogin      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sessions  Session[]
+  accessLogs AccessLog[]
+  receivables Receivable[]
+  payables   Payable[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model AccessLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String   // login, logout, failed_login, action
+  details   String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("access_logs")
+}
+
+// ==================== CADASTROS BASE ====================
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  document  String?  // CPF ou CNPJ
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  receivables Receivable[]
+
+  @@map("customers")
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  document  String?  // CPF ou CNPJ
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payables Payable[]
+
+  @@map("suppliers")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // receivable, payable
+  color     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  receivables Receivable[]
+  payables    Payable[]
+
+  @@map("categories")
+}
+
+// ==================== CONTAS A RECEBER ====================
+
+model Receivable {
+  id           String    @id @default(cuid())
+  description  String
+  amount       Float
+  dueDate      DateTime
+  paidDate     DateTime?
+  paidAmount   Float?
+  status       String    @default("pending") // pending, paid, overdue, cancelled
+  documentNumber String?
+  notes        String?
+
+  customerId   String?
+  categoryId   String?
+  createdById  String
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  customer  Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  category  Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy User       @relation(fields: [createdById], references: [id])
+
+  @@map("receivables")
+}
+
+// ==================== CONTAS A PAGAR ====================
+
+model Payable {
+  id           String    @id @default(cuid())
+  description  String
+  amount       Float
+  dueDate      DateTime
+  paidDate     DateTime?
+  paidAmount   Float?
+  status       String    @default("pending") // pending, paid, overdue, cancelled, approved
+  documentNumber String?
+  notes        String?
+
+  supplierId   String?
+  categoryId   String?
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy  User      @relation(fields: [createdById], references: [id])
+
+  @@map("payables")
+}
